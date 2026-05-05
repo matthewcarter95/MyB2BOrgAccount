@@ -21,18 +21,13 @@ EXISTING_URL=$(aws lambda get-function-url-config \
 if [ -n "${EXISTING_URL}" ] && [ "${EXISTING_URL}" != "null" ]; then
   echo "Function URL already exists: ${EXISTING_URL}"
 
-  # Update CORS configuration
+  # Update CORS configuration using wildcard for methods
   echo "Updating CORS configuration..."
   aws lambda update-function-url-config \
     --function-name "${FUNCTION_NAME}" \
     --region "${REGION}" \
-    --cors '{
-      "AllowOrigins": ["'"${FRONTEND_URL}"'"],
-      "AllowMethods": ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-      "AllowHeaders": ["Content-Type", "Authorization", "Cookie"],
-      "AllowCredentials": true,
-      "MaxAge": 86400
-    }' > /dev/null
+    --cors "AllowOrigins=${FRONTEND_URL},AllowMethods=*,AllowHeaders=content-type,authorization,cookie,AllowCredentials=true,MaxAge=86400" \
+    > /dev/null
 
   echo "CORS updated for: ${EXISTING_URL}"
 else
@@ -42,13 +37,7 @@ else
     --function-name "${FUNCTION_NAME}" \
     --region "${REGION}" \
     --auth-type NONE \
-    --cors '{
-      "AllowOrigins": ["'"${FRONTEND_URL}"'"],
-      "AllowMethods": ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-      "AllowHeaders": ["Content-Type", "Authorization", "Cookie"],
-      "AllowCredentials": true,
-      "MaxAge": 86400
-    }')
+    --cors "AllowOrigins=${FRONTEND_URL},AllowMethods=*,AllowHeaders=content-type,authorization,cookie,AllowCredentials=true,MaxAge=86400")
 
   FUNCTION_URL=$(echo "${RESULT}" | jq -r '.FunctionUrl')
 
@@ -71,6 +60,6 @@ else
   echo ""
   echo "Next steps:"
   echo "1. Add this URL to Auth0 callback settings"
-  echo "2. Update frontend VITE_API_URL environment variable"
+  echo "2. Update Amplify environment variable VITE_API_URL"
   echo "3. Configure Auth0 backchannel logout URL: ${FUNCTION_URL}auth/backchannel-logout"
 fi
