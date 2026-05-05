@@ -21,14 +21,8 @@ import {
 } from './routes/org.js';
 import { handleGetCommodities } from './routes/commodities.js';
 
-const FRONTEND_URL = process.env.FRONTEND_URL || 'https://myaccount.demo-connect.us';
-
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': FRONTEND_URL,
-  'Access-Control-Allow-Credentials': 'true',
-  'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-};
+// CORS is handled by Lambda Function URL configuration
+// Do not add CORS headers here to avoid duplicate headers
 
 function jsonResponse(
   statusCode: number,
@@ -39,7 +33,6 @@ function jsonResponse(
     statusCode,
     headers: {
       'Content-Type': 'application/json',
-      ...CORS_HEADERS,
       ...headers,
     },
     body: JSON.stringify(body),
@@ -52,10 +45,7 @@ function redirectResponse(
 ): APIGatewayProxyResultV2 {
   return {
     statusCode,
-    headers: {
-      ...CORS_HEADERS,
-      ...headers,
-    },
+    headers,
   };
 }
 
@@ -63,12 +53,9 @@ export async function handler(event: APIGatewayProxyEventV2): Promise<APIGateway
   const { requestContext, rawPath } = event;
   const method = requestContext.http.method;
 
-  // Handle CORS preflight
+  // CORS preflight is handled by Lambda Function URL
   if (method === 'OPTIONS') {
-    return {
-      statusCode: 204,
-      headers: CORS_HEADERS,
-    };
+    return { statusCode: 204 };
   }
 
   const sessionId = getSessionIdFromCookie(event);
@@ -85,12 +72,12 @@ export async function handler(event: APIGatewayProxyEventV2): Promise<APIGateway
 
     // Auth routes
     if (method === 'GET' && path === '/auth/login') {
-      const { statusCode, headers } = handleLogin();
+      const { statusCode, headers } = await handleLogin();
       return redirectResponse(statusCode, headers);
     }
 
     if (method === 'GET' && path === '/auth/signup') {
-      const { statusCode, headers } = handleSignup();
+      const { statusCode, headers } = await handleSignup();
       return redirectResponse(statusCode, headers);
     }
 
@@ -124,7 +111,7 @@ export async function handler(event: APIGatewayProxyEventV2): Promise<APIGateway
       const result = await handleBackchannelLogout(event);
       return {
         statusCode: result.statusCode,
-        headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
+        headers: { 'Content-Type': 'application/json' },
         body: result.body,
       };
     }

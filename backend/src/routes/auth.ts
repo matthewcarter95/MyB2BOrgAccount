@@ -17,36 +17,22 @@ import {
   revokeSessionsBySid,
   revokeSessionsByUserId,
   isSessionValid,
+  storePkceState,
+  getPkceState,
+  deletePkceState,
 } from '../session.js';
 import type { ApiResponse, UserInfo, AuthStatusResponse } from '../types.js';
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'https://myaccount.demo-connect.us';
 
-// In-memory store for PKCE state (in production, use Redis or DynamoDB)
-const pkceStore = new Map<string, { codeVerifier: string; expiresAt: number }>();
-
-function cleanupPkceStore(): void {
-  const now = Date.now();
-  for (const [key, value] of pkceStore.entries()) {
-    if (value.expiresAt < now) {
-      pkceStore.delete(key);
-    }
-  }
-}
-
-export function handleLogin(): { statusCode: number; headers: Record<string, string> } {
-  cleanupPkceStore();
-
+export async function handleLogin(): Promise<{ statusCode: number; headers: Record<string, string> }> {
   const state = generateState();
   const codeVerifier = generateCodeVerifier();
 
-  // Store PKCE verifier with 10 minute expiry
-  pkceStore.set(state, {
-    codeVerifier,
-    expiresAt: Date.now() + 10 * 60 * 1000,
-  });
+  // Store PKCE verifier in DynamoDB (survives across Lambda invocations)
+  await storePkceState(state, codeVerifier);
 
-  const loginUrl = generateLoginUrl(state, codeVerifier);
+  const loginUrl = await generateLoginUrl(state, codeVerifier);
 
   return {
     statusCode: 302,
@@ -57,18 +43,13 @@ export function handleLogin(): { statusCode: number; headers: Record<string, str
   };
 }
 
-export function handleSignup(): { statusCode: number; headers: Record<string, string> } {
-  cleanupPkceStore();
-
+export async function handleSignup(): Promise<{ statusCode: number; headers: Record<string, string> }> {
   const state = generateState();
   const codeVerifier = generateCodeVerifier();
 
-  pkceStore.set(state, {
-    codeVerifier,
-    expiresAt: Date.now() + 10 * 60 * 1000,
-  });
+  await storePkceState(state, codeVerifier);
 
-  const signupUrl = generateSignupUrl(state, codeVerifier);
+  const signupUrl = await generateSignupUrl(state, codeVerifier);
 
   return {
     statusCode: 302,
@@ -85,7 +66,10 @@ export async function handleCallback(
   const params = event.queryStringParameters || {};
   const { code, state, error, error_description } = params;
 
+  console.log('Callback received:', { code: code ? 'present' : 'missing', state: state ? 'present' : 'missing', error });
+
   if (error) {
+    console.log('Auth error from Auth0:', error, error_description);
     return {
       statusCode: 302,
       headers: {
@@ -95,6 +79,7 @@ export async function handleCallback(
   }
 
   if (!code || !state) {
+    console.log('Missing code or state');
     return {
       statusCode: 400,
       headers: { 'Content-Type': 'application/json' },
@@ -102,8 +87,9 @@ export async function handleCallback(
     };
   }
 
-  const pkceData = pkceStore.get(state);
-  if (!pkceData) {
+  const codeVerifier = await getPkceState(state);
+  console.log('PKCE state lookup:', { found: !!codeVerifier });
+  if (!codeVerifier) {
     return {
       statusCode: 400,
       headers: { 'Content-Type': 'application/json' },
@@ -111,27 +97,35 @@ export async function handleCallback(
     };
   }
 
-  pkceStore.delete(state);
+  // Delete PKCE state after retrieval
+  await deletePkceState(state);
 
   try {
-    const tokens = await exchangeCodeForTokens(code, pkceData.codeVerifier);
+    console.log('Exchanging code for tokens...');
+    const tokens = await exchangeCodeForTokens(code, codeVerifier);
+    console.log('Token exchange successful, verifying ID token...');
     const claims = await verifyIdToken(tokens.id_token);
+    console.log('ID token verified, creating session...');
 
     // Get user's organizations (from ID token or Management API)
     const orgs = claims.org_id ? [claims.org_id] : [];
 
     const session = await createSession(tokens, claims, orgs);
 
+    console.log('Session created:', session.sessionId);
+
     // Set HTTP-only session cookie
+    // SameSite=None required for cross-domain cookies (Lambda URL != frontend domain)
     const cookieOptions = [
       `session=${session.sessionId}`,
       'HttpOnly',
       'Secure',
-      'SameSite=Lax',
+      'SameSite=None',
       'Path=/',
       `Max-Age=${24 * 60 * 60}`, // 24 hours
     ].join('; ');
 
+    console.log('Redirecting to dashboard with session cookie');
     return {
       statusCode: 302,
       headers: {
@@ -165,7 +159,7 @@ export async function handleLogout(
     'session=',
     'HttpOnly',
     'Secure',
-    'SameSite=Lax',
+    'SameSite=None',
     'Path=/',
     'Max-Age=0',
   ].join('; ');

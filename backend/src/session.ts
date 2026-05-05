@@ -231,3 +231,57 @@ export function isSessionValid(session: Session): boolean {
   if (session.expiresAt < now) return false;
   return true;
 }
+
+// PKCE state storage for OAuth flow (survives across Lambda invocations)
+interface PkceState {
+  sessionId: string; // PK - use state as sessionId with 'pkce:' prefix
+  codeVerifier: string;
+  expiresAt: number; // TTL
+}
+
+export async function storePkceState(state: string, codeVerifier: string): Promise<void> {
+  const item: PkceState = {
+    sessionId: `pkce:${state}`,
+    codeVerifier,
+    expiresAt: Math.floor((Date.now() + 10 * 60 * 1000) / 1000), // 10 min TTL
+  };
+
+  await docClient.send(
+    new PutCommand({
+      TableName: TABLE_NAME,
+      Item: item,
+    })
+  );
+}
+
+export async function getPkceState(state: string): Promise<string | null> {
+  const result = await docClient.send(
+    new GetCommand({
+      TableName: TABLE_NAME,
+      Key: { sessionId: `pkce:${state}` },
+    })
+  );
+
+  if (!result.Item) {
+    return null;
+  }
+
+  const pkce = result.Item as PkceState;
+
+  // Check expiry
+  const now = Math.floor(Date.now() / 1000);
+  if (pkce.expiresAt < now) {
+    return null;
+  }
+
+  return pkce.codeVerifier;
+}
+
+export async function deletePkceState(state: string): Promise<void> {
+  await docClient.send(
+    new DeleteCommand({
+      TableName: TABLE_NAME,
+      Key: { sessionId: `pkce:${state}` },
+    })
+  );
+}

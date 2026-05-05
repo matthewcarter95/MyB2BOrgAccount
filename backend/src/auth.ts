@@ -4,21 +4,17 @@ import type { TokenSet, IdTokenClaims } from './types.js';
 const AUTH0_DOMAIN = process.env.AUTH0_DOMAIN || 'devlabs.demo-connect.us';
 const AUTH0_CLIENT_ID = process.env.AUTH0_CLIENT_ID || '';
 const AUTH0_CLIENT_SECRET = process.env.AUTH0_CLIENT_SECRET || '';
-const AUTH0_AUDIENCE = process.env.AUTH0_AUDIENCE || '';
+const AUTH0_AUDIENCE = process.env.AUTH0_AUDIENCE || ''; // Custom API audience, not My Org
+const AUTH0_MYORG_AUDIENCE = process.env.AUTH0_MYORG_AUDIENCE || ''; // My Org API (original tenant domain)
 const FRONTEND_URL = process.env.FRONTEND_URL || 'https://myaccount.demo-connect.us';
+const BACKEND_URL = process.env.BACKEND_URL || ''; // Lambda Function URL for callbacks
 
+// Basic OIDC scopes only - My Org API requires original tenant domain, not custom domain
 const AUTH0_SCOPES = [
   'openid',
   'profile',
   'email',
   'offline_access',
-  'read:my_org:configuration',
-  'read:my_org:details',
-  'update:my_org:details',
-  'read:my_org:identity_providers',
-  'create:my_org:identity_providers',
-  'update:my_org:identity_providers',
-  'delete:my_org:identity_providers',
 ].join(' ');
 
 let jwks: jose.JWTVerifyGetKey | null = null;
@@ -30,52 +26,57 @@ async function getJWKS(): Promise<jose.JWTVerifyGetKey> {
   return jwks;
 }
 
-export function generateLoginUrl(state: string, codeVerifier: string): string {
-  const codeChallenge = generateCodeChallenge(codeVerifier);
+export async function generateLoginUrl(state: string, codeVerifier: string): Promise<string> {
+  const codeChallenge = await generateCodeChallenge(codeVerifier);
+  // Callback goes to BFF (Lambda), not frontend
+  const callbackUrl = BACKEND_URL ? `${BACKEND_URL}/auth/callback` : `${FRONTEND_URL}/callback`;
 
   const params = new URLSearchParams({
     response_type: 'code',
     client_id: AUTH0_CLIENT_ID,
-    redirect_uri: `${FRONTEND_URL}/callback`,
+    redirect_uri: callbackUrl,
     scope: AUTH0_SCOPES,
-    audience: AUTH0_AUDIENCE,
     state,
     code_challenge: codeChallenge,
     code_challenge_method: 'S256',
   });
 
+  // Only add audience if configured (for custom API)
+  if (AUTH0_AUDIENCE) {
+    params.set('audience', AUTH0_AUDIENCE);
+  }
+
   return `https://${AUTH0_DOMAIN}/authorize?${params.toString()}`;
 }
 
-export function generateSignupUrl(state: string, codeVerifier: string): string {
-  const codeChallenge = generateCodeChallenge(codeVerifier);
+export async function generateSignupUrl(state: string, codeVerifier: string): Promise<string> {
+  const codeChallenge = await generateCodeChallenge(codeVerifier);
+  const callbackUrl = BACKEND_URL ? `${BACKEND_URL}/auth/callback` : `${FRONTEND_URL}/callback`;
 
   const params = new URLSearchParams({
     response_type: 'code',
     client_id: AUTH0_CLIENT_ID,
-    redirect_uri: `${FRONTEND_URL}/callback`,
+    redirect_uri: callbackUrl,
     scope: AUTH0_SCOPES,
-    audience: AUTH0_AUDIENCE,
     state,
     code_challenge: codeChallenge,
     code_challenge_method: 'S256',
     screen_hint: 'signup',
   });
 
+  // Only add audience if configured (for custom API)
+  if (AUTH0_AUDIENCE) {
+    params.set('audience', AUTH0_AUDIENCE);
+  }
+
   return `https://${AUTH0_DOMAIN}/authorize?${params.toString()}`;
 }
 
-function generateCodeChallenge(verifier: string): string {
+async function generateCodeChallenge(verifier: string): Promise<string> {
   const encoder = new TextEncoder();
   const data = encoder.encode(verifier);
-  const hashBuffer = new Uint8Array(32);
-
-  // Simple hash for code challenge (in production, use proper SHA-256)
-  for (let i = 0; i < data.length; i++) {
-    hashBuffer[i % 32] ^= data[i];
-  }
-
-  return base64UrlEncode(hashBuffer);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  return base64UrlEncode(new Uint8Array(hashBuffer));
 }
 
 function base64UrlEncode(buffer: Uint8Array): string {
@@ -102,6 +103,8 @@ export async function exchangeCodeForTokens(
   code: string,
   codeVerifier: string
 ): Promise<TokenSet> {
+  const callbackUrl = BACKEND_URL ? `${BACKEND_URL}/auth/callback` : `${FRONTEND_URL}/callback`;
+
   const response = await fetch(`https://${AUTH0_DOMAIN}/oauth/token`, {
     method: 'POST',
     headers: {
@@ -112,7 +115,7 @@ export async function exchangeCodeForTokens(
       client_id: AUTH0_CLIENT_ID,
       client_secret: AUTH0_CLIENT_SECRET,
       code,
-      redirect_uri: `${FRONTEND_URL}/callback`,
+      redirect_uri: callbackUrl,
       code_verifier: codeVerifier,
     }),
   });
@@ -184,6 +187,45 @@ export async function getUserOrganizations(accessToken: string): Promise<string[
   // or can be fetched from Auth0 Management API if needed
   // For now, we'll rely on the org_id from the ID token
   return [];
+}
+
+// Exchange refresh token for My Org API scoped access token
+export async function exchangeForMyOrgToken(refreshToken: string): Promise<TokenSet | null> {
+  if (!AUTH0_MYORG_AUDIENCE) {
+    return null;
+  }
+
+  const response = await fetch(`https://${AUTH0_DOMAIN}/oauth/token`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      grant_type: 'refresh_token',
+      client_id: AUTH0_CLIENT_ID,
+      client_secret: AUTH0_CLIENT_SECRET,
+      refresh_token: refreshToken,
+      audience: AUTH0_MYORG_AUDIENCE,
+      scope: [
+        'openid',
+        'offline_access',
+        'read:my_org:configuration',
+        'read:my_org:details',
+        'update:my_org:details',
+        'read:my_org:identity_providers',
+        'create:my_org:identity_providers',
+        'update:my_org:identity_providers',
+        'delete:my_org:identity_providers',
+      ].join(' '),
+    }),
+  });
+
+  if (!response.ok) {
+    console.error('My Org token exchange failed:', await response.text());
+    return null;
+  }
+
+  return response.json();
 }
 
 export function generateLogoutUrl(returnTo: string): string {
