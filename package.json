@@ -1,0 +1,21 @@
+{
+  "name": "eadm-online-services",
+  "version": "1.0.0",
+  "private": true,
+  "description": "e-ADM Online Services - B2B Organization Management",
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "build": "npm run build -w frontend && npm run build -w backend",
+    "build:frontend": "npm run build -w frontend",
+    "build:backend": "npm run build -w backend",
+    "dev:frontend": "npm run dev -w frontend",
+    "lint": "npm run lint -w frontend && npm run lint -w backend",
+    "deploy:backend": "npm run build -w backend && aws cloudformation deploy --template-file infra/template.yaml --stack-name eadm-backend --capabilities CAPABILITY_IAM && ./scripts/add-function-url.sh"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

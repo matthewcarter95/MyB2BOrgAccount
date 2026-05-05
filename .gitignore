@@ -141,3 +141,21 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Lambda deployment
+backend/lambda.zip
+*.zip
+
+# AWS SAM / Amplify
+.aws-sam/
+.amplify/
+samconfig.toml
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+*.swp
+*.swo

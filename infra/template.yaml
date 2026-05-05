@@ -1,0 +1,182 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: e-ADM Online Services Backend Infrastructure
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - staging
+      - prod
+    Description: Deployment environment
+
+  Auth0Domain:
+    Type: String
+    Default: devlabs.demo-connect.us
+    Description: Auth0 domain
+
+  Auth0ClientId:
+    Type: String
+    Default: uNF6pehJEsJh0SbkzIHOt958Dya80jYJ
+    Description: Auth0 client ID
+
+  Auth0ClientSecret:
+    Type: String
+    NoEcho: true
+    Description: Auth0 client secret
+
+  Auth0Audience:
+    Type: String
+    Default: https://violet-hookworm-18506.cic-demo-platform.auth0app.com/my-org/
+    Description: Auth0 My Org API audience
+
+  FrontendUrl:
+    Type: String
+    Default: https://myaccount.demo-connect.us
+    Description: Frontend URL for CORS and redirects
+
+  SessionEncryptionKey:
+    Type: String
+    NoEcho: true
+    Description: Key for encrypting session tokens
+
+Resources:
+  # DynamoDB Session Table
+  SessionsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub eadm-sessions-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: sessionId
+          AttributeType: S
+        - AttributeName: sid
+          AttributeType: S
+        - AttributeName: userId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: sessionId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: sid-index
+          KeySchema:
+            - AttributeName: sid
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+        - IndexName: userId-index
+          KeySchema:
+            - AttributeName: userId
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: true
+      Tags:
+        - Key: Application
+          Value: eadm-online-services
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Lambda Execution Role
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub eadm-lambda-role-${Environment}
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: DynamoDBAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:Query
+                Resource:
+                  - !GetAtt SessionsTable.Arn
+                  - !Sub ${SessionsTable.Arn}/index/*
+      Tags:
+        - Key: Application
+          Value: eadm-online-services
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Lambda Function
+  BffLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub eadm-bff-${Environment}
+      Runtime: nodejs20.x
+      Handler: handler.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        ZipFile: |
+          exports.handler = async (event) => {
+            return {
+              statusCode: 200,
+              body: JSON.stringify({ message: 'Deploy backend code' })
+            };
+          };
+      Timeout: 30
+      MemorySize: 256
+      Environment:
+        Variables:
+          AUTH0_DOMAIN: !Ref Auth0Domain
+          AUTH0_CLIENT_ID: !Ref Auth0ClientId
+          AUTH0_CLIENT_SECRET: !Ref Auth0ClientSecret
+          AUTH0_AUDIENCE: !Ref Auth0Audience
+          FRONTEND_URL: !Ref FrontendUrl
+          SESSIONS_TABLE: !Ref SessionsTable
+          SESSION_ENCRYPTION_KEY: !Ref SessionEncryptionKey
+          AWS_NODEJS_CONNECTION_REUSE_ENABLED: '1'
+      Tags:
+        - Key: Application
+          Value: eadm-online-services
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Lambda Log Group
+  LambdaLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/eadm-bff-${Environment}
+      RetentionInDays: 14
+
+Outputs:
+  LambdaFunctionArn:
+    Description: Lambda function ARN
+    Value: !GetAtt BffLambda.Arn
+    Export:
+      Name: !Sub ${AWS::StackName}-LambdaArn
+
+  LambdaFunctionName:
+    Description: Lambda function name
+    Value: !Ref BffLambda
+    Export:
+      Name: !Sub ${AWS::StackName}-LambdaName
+
+  SessionsTableName:
+    Description: DynamoDB sessions table name
+    Value: !Ref SessionsTable
+    Export:
+      Name: !Sub ${AWS::StackName}-SessionsTable
+
+  SessionsTableArn:
+    Description: DynamoDB sessions table ARN
+    Value: !GetAtt SessionsTable.Arn
+    Export:
+      Name: !Sub ${AWS::StackName}-SessionsTableArn
