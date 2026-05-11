@@ -159,3 +159,6 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+
+# Local MCP configuration
+.mcp.json

@@ -70,8 +70,15 @@ export function Dashboard() {
             <div className="stat-content">
               <span className="stat-label">Role</span>
               <span className="stat-value">
-                {user.isAdmin ? (
-                  <span className="badge badge-admin">Admin</span>
+                {user.roles && user.roles.length > 0 ? (
+                  user.roles.map((role) => (
+                    <span
+                      key={role}
+                      className={`badge ${role.toLowerCase() === 'admin' ? 'badge-admin' : 'badge-member'}`}
+                    >
+                      {role}
+                    </span>
+                  ))
                 ) : (
                   <span className="badge badge-member">Member</span>
                 )}
