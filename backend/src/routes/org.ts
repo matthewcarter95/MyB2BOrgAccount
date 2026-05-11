@@ -13,9 +13,10 @@ import {
   getSessionWithDecryptedTokens,
   updateSessionOrg,
   updateSessionMyOrgToken,
+  updateSessionAfterOrgSwitch,
   isSessionValid,
 } from '../session.js';
-import { exchangeForMyOrgToken } from '../auth.js';
+import { exchangeForMyOrgToken, exchangeRefreshTokenForOrg, verifyIdToken } from '../auth.js';
 import type { ApiResponse, OrgDetails, OrgConfig, IdentityProvider } from '../types.js';
 
 async function getValidSession(sessionId: string | null) {
@@ -40,13 +41,16 @@ async function getMyOrgAccessToken(session: Awaited<ReturnType<typeof getSession
   console.log('Session roles (https://example.com/roles):', session.roles);
   console.log('Session orgId:', session.orgId);
 
-  // Prefer the initial access token from login if it has the My Org audience —
-  // it carries the org-picker session context that refresh token exchanges may lack.
+  // Prefer the initial access token if it has My Org audience AND My Org API scopes.
+  // After a POST /org/switch token exchange the access token may have My Org audience
+  // but only basic scopes — skip it in that case so we fall through to a fresh exchange.
   try {
     const parts = session.decryptedAccessToken.split('.');
     const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
     const aud: string[] = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
-    if (aud.some((a) => a.includes('/my-org/'))) {
+    const hasMyOrgAudience = aud.some((a) => a.includes('/my-org/'));
+    const hasMyOrgScope = payload.scope && payload.scope.includes('read:my_org:');
+    if (hasMyOrgAudience && hasMyOrgScope) {
       console.log('Using initial access token (my-org audience), scope:', payload.scope);
       return session.decryptedAccessToken;
     }
@@ -291,15 +295,46 @@ export async function handleSwitchOrg(
       return { success: false, error: 'Missing orgId' };
     }
 
-    // Verify user has access to this org
-    if (!result.session.orgs.includes(orgId)) {
-      return { success: false, error: 'Access denied to organization' };
+    const session = result.session;
+
+    if (!session.decryptedRefreshToken) {
+      console.log('Session has no refresh token — user must re-authenticate');
+      return { success: false, error: 'No refresh token available' };
     }
 
-    // Update session with new org
-    await updateSessionOrg(result.session.sessionId, orgId);
+    // Exchange refresh token for a user token in the target org (profile/email scopes).
+    // Auth0 rejects this if the user is not a member of the org.
+    const newTokens = await exchangeRefreshTokenForOrg(session.decryptedRefreshToken, orgId);
+    if (!newTokens) {
+      return { success: false, error: 'Organization not accessible or token exchange failed' };
+    }
 
-    return { success: true, data: { orgId } };
+    // Decode id_token header to log issuer before verification
+    try {
+      const [header, body] = newTokens.id_token.split('.');
+      const h = JSON.parse(Buffer.from(header, 'base64').toString());
+      const b = JSON.parse(Buffer.from(body, 'base64').toString());
+      console.log('id_token header:', JSON.stringify(h));
+      console.log('id_token iss:', b.iss, 'aud:', b.aud, 'org_id:', b.org_id);
+    } catch (e) {
+      console.log('Could not decode id_token for logging');
+    }
+
+    console.log('Verifying id_token...');
+    // Verify the new id_token to get org-specific claims (roles, subscription tier)
+    const newClaims = await verifyIdToken(newTokens.id_token);
+    console.log('id_token verified, org_id:', newClaims.org_id);
+    const namespace = 'https://example.com';
+    const newRoles = (newClaims[`${namespace}/roles`] as string[]) || [];
+    const newSubscriptionTier = (newClaims[`${namespace}/subscription_tier`] as string) || 'basic';
+    const newOrgId = newClaims.org_id || orgId;
+
+    // Accumulate known orgs so the user can switch back without another auth flow
+    const updatedOrgs = [...new Set([...session.orgs, newOrgId])];
+
+    await updateSessionAfterOrgSwitch(session.sessionId, newTokens, newOrgId, newRoles, newSubscriptionTier, updatedOrgs);
+
+    return { success: true, data: { orgId: newOrgId } };
   } catch (err) {
     console.error('Switch org error:', err);
     return { success: false, error: 'Failed to switch organization' };

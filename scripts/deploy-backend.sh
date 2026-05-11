@@ -27,8 +27,10 @@ fi
 # Build backend
 echo ""
 echo "1. Building backend..."
-cd "${ROOT_DIR}"
-npm run build -w backend
+cd "${ROOT_DIR}/backend"
+"${ROOT_DIR}/node_modules/esbuild/bin/esbuild" src/handler.ts \
+  --bundle --platform=node --target=node20 \
+  --outfile=dist/handler.js --format=cjs --external:@aws-sdk/*
 
 # Package Lambda code
 echo ""
@@ -51,7 +53,9 @@ aws cloudformation deploy \
     Environment="${ENVIRONMENT}" \
     Auth0ClientSecret="${AUTH0_CLIENT_SECRET}" \
     SessionEncryptionKey="${SESSION_ENCRYPTION_KEY}" \
-    FrontendUrl="${FRONTEND_URL:-https://myaccount.demo-connect.us}"
+    FrontendUrl="${FRONTEND_URL:-https://myaccount.demo-connect.us}" \
+    Auth0Domain="${AUTH0_DOMAIN:-violet-hookworm-18506.cic-demo-platform.auth0app.com}" \
+    BackendUrl="${BACKEND_URL:-}"
 
 # Update Lambda code
 echo ""

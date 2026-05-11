@@ -36,6 +36,11 @@ Parameters:
     Default: https://myaccount.demo-connect.us
     Description: Frontend URL for CORS and redirects
 
+  BackendUrl:
+    Type: String
+    Default: ''
+    Description: Lambda Function URL (set after first deploy via add-function-url.sh)
+
   SessionEncryptionKey:
     Type: String
     NoEcho: true
@@ -140,6 +145,7 @@ Resources:
           AUTH0_CLIENT_SECRET: !Ref Auth0ClientSecret
           AUTH0_AUDIENCE: !Ref Auth0Audience
           FRONTEND_URL: !Ref FrontendUrl
+          BACKEND_URL: !Ref BackendUrl
           SESSIONS_TABLE: !Ref SessionsTable
           SESSION_ENCRYPTION_KEY: !Ref SessionEncryptionKey
           AWS_NODEJS_CONNECTION_REUSE_ENABLED: '1'

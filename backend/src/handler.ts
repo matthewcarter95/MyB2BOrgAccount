@@ -125,7 +125,7 @@ export async function handler(event: APIGatewayProxyEventV2): Promise<APIGateway
     // Organization routes
     if (method === 'GET' && path === '/org/details') {
       const result = await handleGetOrgDetails(sessionId);
-      return jsonResponse(result.success ? 200 : (result.error === 'Not authenticated' ? 401 : 500), result);
+      return jsonResponse(result.success ? 200 : 401, result);
     }
 
     if (method === 'PATCH' && path === '/org/details') {

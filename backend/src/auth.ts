@@ -65,7 +65,6 @@ export async function generateReauthUrl(state: string, codeVerifier: string): Pr
     state,
     code_challenge: codeChallenge,
     code_challenge_method: 'S256',
-    prompt: 'login',
   });
 
   if (AUTH0_MYORG_AUDIENCE) {
@@ -212,6 +211,36 @@ export async function getUserOrganizations(accessToken: string): Promise<string[
   // or can be fetched from Auth0 Management API if needed
   // For now, we'll rely on the org_id from the ID token
   return [];
+}
+
+// Exchange refresh token for a basic user token in the target org (no My Org API audience).
+// Used for org switching: gets id_token with profile/email + org-specific claims.
+// My Org API access is obtained separately via exchangeForMyOrgToken.
+export async function exchangeRefreshTokenForOrg(
+  refreshToken: string,
+  organizationId: string
+): Promise<TokenSet | null> {
+  const response = await fetch(`https://${AUTH0_DOMAIN}/oauth/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      grant_type: 'refresh_token',
+      client_id: AUTH0_CLIENT_ID,
+      client_secret: AUTH0_CLIENT_SECRET,
+      refresh_token: refreshToken,
+      organization: organizationId,
+      scope: 'openid profile email offline_access',
+    }),
+  });
+
+  if (!response.ok) {
+    console.error('Org switch token exchange failed:', await response.text());
+    return null;
+  }
+
+  const tokens = await response.json() as TokenSet & { scope?: string };
+  console.log('Org switch token received, scope:', tokens.scope || 'not returned');
+  return tokens;
 }
 
 // Exchange refresh token for My Org API scoped access token

@@ -148,18 +148,21 @@ export async function handleCallback(
     console.log('ID token roles (https://example.com/roles):', roles);
     console.log('ID token org_id:', claims.org_id);
 
-    // Get user's organizations (from ID token or Management API)
-    const orgs = claims.org_id ? [claims.org_id] : [];
+    // Merge orgs from the previous session (reauth flow) so the dropdown
+    // can offer instant token-exchange switching back to the previous org.
+    let orgs = claims.org_id ? [claims.org_id] : [];
+    if (oldSessionId) {
+      const oldSession = await getSession(oldSessionId);
+      if (oldSession?.orgs?.length) {
+        orgs = [...new Set([...orgs, ...oldSession.orgs])];
+      }
+      await revokeSession(oldSessionId);
+      console.log('Revoked old session:', oldSessionId, 'merged orgs:', orgs);
+    }
 
     const session = await createSession(tokens, claims, orgs);
 
     console.log('Session created:', session.sessionId);
-
-    // Revoke the previous session when this was a reauth flow
-    if (oldSessionId) {
-      await revokeSession(oldSessionId);
-      console.log('Revoked old session:', oldSessionId);
-    }
 
     // Set HTTP-only session cookie
     // SameSite=None required for cross-domain cookies (Lambda URL != frontend domain)

@@ -113,6 +113,45 @@ export async function getSessionWithDecryptedTokens(
   };
 }
 
+export async function updateSessionAfterOrgSwitch(
+  sessionId: string,
+  tokens: { access_token: string; id_token: string; refresh_token?: string },
+  newOrgId: string,
+  roles: string[],
+  subscriptionTier: string,
+  orgs: string[]
+): Promise<void> {
+  // Only update refreshToken if Auth0 returned a new one (rotation enabled).
+  // Without rotation, the original refresh token remains valid — preserving it
+  // prevents the session from losing its ability to switch orgs again.
+  const updateExpression = tokens.refresh_token
+    ? 'SET orgId = :orgId, orgs = :orgs, #roles = :roles, subscriptionTier = :subscriptionTier, accessToken = :accessToken, idToken = :idToken, refreshToken = :refreshToken REMOVE myOrgAccessToken'
+    : 'SET orgId = :orgId, orgs = :orgs, #roles = :roles, subscriptionTier = :subscriptionTier, accessToken = :accessToken, idToken = :idToken REMOVE myOrgAccessToken';
+
+  const expressionValues: Record<string, unknown> = {
+    ':orgId': newOrgId,
+    ':orgs': orgs,
+    ':roles': roles,
+    ':subscriptionTier': subscriptionTier,
+    ':accessToken': encrypt(tokens.access_token),
+    ':idToken': encrypt(tokens.id_token),
+  };
+
+  if (tokens.refresh_token) {
+    expressionValues[':refreshToken'] = encrypt(tokens.refresh_token);
+  }
+
+  await docClient.send(
+    new UpdateCommand({
+      TableName: TABLE_NAME,
+      Key: { sessionId },
+      UpdateExpression: updateExpression,
+      ExpressionAttributeNames: { '#roles': 'roles' },
+      ExpressionAttributeValues: expressionValues,
+    })
+  );
+}
+
 export async function updateSessionOrg(sessionId: string, newOrgId: string): Promise<void> {
   await docClient.send(
     new UpdateCommand({
@@ -268,7 +307,7 @@ export async function storePkceState(
   const item: PkceState = {
     sessionId: `pkce:${state}`,
     codeVerifier,
-    expiresAt: Math.floor((Date.now() + 10 * 60 * 1000) / 1000), // 10 min TTL
+    expiresAt: Math.floor((Date.now() + 15 * 60 * 1000) / 1000), // 15 min TTL
     ...(oldSessionId && { oldSessionId }),
   };
 
