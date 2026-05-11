@@ -1,20 +1,25 @@
 import * as jose from 'jose';
 import type { TokenSet, IdTokenClaims } from './types.js';
 
-const AUTH0_DOMAIN = process.env.AUTH0_DOMAIN || 'devlabs.demo-connect.us';
+const AUTH0_DOMAIN = process.env.AUTH0_DOMAIN || 'violet-hookworm-18506.cic-demo-platform.auth0app.com';
 const AUTH0_CLIENT_ID = process.env.AUTH0_CLIENT_ID || '';
 const AUTH0_CLIENT_SECRET = process.env.AUTH0_CLIENT_SECRET || '';
 const AUTH0_AUDIENCE = process.env.AUTH0_AUDIENCE || ''; // Custom API audience, not My Org
-const AUTH0_MYORG_AUDIENCE = process.env.AUTH0_MYORG_AUDIENCE || ''; // My Org API (original tenant domain)
+const AUTH0_MYORG_AUDIENCE = process.env.AUTH0_MYORG_AUDIENCE || process.env.AUTH0_AUDIENCE || ''; // My Org API (original tenant domain)
 const FRONTEND_URL = process.env.FRONTEND_URL || 'https://myaccount.demo-connect.us';
 const BACKEND_URL = process.env.BACKEND_URL || ''; // Lambda Function URL for callbacks
 
-// Basic OIDC scopes only - My Org API requires original tenant domain, not custom domain
 const AUTH0_SCOPES = [
   'openid',
   'profile',
   'email',
   'offline_access',
+  'read:my_org:details',
+  'update:my_org:details',
+  'read:my_org:identity_providers',
+  'create:my_org:identity_providers',
+  'update:my_org:identity_providers',
+  'delete:my_org:identity_providers',
 ].join(' ');
 
 let jwks: jose.JWTVerifyGetKey | null = null;
@@ -41,9 +46,8 @@ export async function generateLoginUrl(state: string, codeVerifier: string): Pro
     code_challenge_method: 'S256',
   });
 
-  // Only add audience if configured (for custom API)
-  if (AUTH0_AUDIENCE) {
-    params.set('audience', AUTH0_AUDIENCE);
+  if (AUTH0_MYORG_AUDIENCE) {
+    params.set('audience', AUTH0_MYORG_AUDIENCE);
   }
 
   return `https://${AUTH0_DOMAIN}/authorize?${params.toString()}`;
@@ -64,9 +68,8 @@ export async function generateSignupUrl(state: string, codeVerifier: string): Pr
     screen_hint: 'signup',
   });
 
-  // Only add audience if configured (for custom API)
-  if (AUTH0_AUDIENCE) {
-    params.set('audience', AUTH0_AUDIENCE);
+  if (AUTH0_MYORG_AUDIENCE) {
+    params.set('audience', AUTH0_MYORG_AUDIENCE);
   }
 
   return `https://${AUTH0_DOMAIN}/authorize?${params.toString()}`;
@@ -190,10 +193,19 @@ export async function getUserOrganizations(accessToken: string): Promise<string[
 }
 
 // Exchange refresh token for My Org API scoped access token
-export async function exchangeForMyOrgToken(refreshToken: string): Promise<TokenSet | null> {
+// The organization parameter is REQUIRED for My Org API scopes to be granted
+export async function exchangeForMyOrgToken(refreshToken: string, organizationId: string): Promise<TokenSet | null> {
   if (!AUTH0_MYORG_AUDIENCE) {
+    console.error('AUTH0_MYORG_AUDIENCE not configured');
     return null;
   }
+
+  if (!organizationId) {
+    console.error('Organization ID required for My Org token exchange');
+    return null;
+  }
+
+  console.log('Requesting My Org token with audience:', AUTH0_MYORG_AUDIENCE, 'organization:', organizationId);
 
   const response = await fetch(`https://${AUTH0_DOMAIN}/oauth/token`, {
     method: 'POST',
@@ -206,10 +218,10 @@ export async function exchangeForMyOrgToken(refreshToken: string): Promise<Token
       client_secret: AUTH0_CLIENT_SECRET,
       refresh_token: refreshToken,
       audience: AUTH0_MYORG_AUDIENCE,
+      organization: organizationId,
       scope: [
         'openid',
         'offline_access',
-        'read:my_org:configuration',
         'read:my_org:details',
         'update:my_org:details',
         'read:my_org:identity_providers',
@@ -225,7 +237,20 @@ export async function exchangeForMyOrgToken(refreshToken: string): Promise<Token
     return null;
   }
 
-  return response.json();
+  const tokens = await response.json() as TokenSet & { scope?: string };
+  console.log('My Org token received, scopes:', tokens.scope || 'not returned');
+
+  // Decode and log the access token claims (for debugging)
+  try {
+    const parts = tokens.access_token.split('.');
+    const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+    console.log('My Org access token audience:', payload.aud);
+    console.log('My Org access token scope:', payload.scope);
+  } catch (e) {
+    console.log('Could not decode access token');
+  }
+
+  return tokens;
 }
 
 export function generateLogoutUrl(returnTo: string): string {
@@ -236,3 +261,4 @@ export function generateLogoutUrl(returnTo: string): string {
 
   return `https://${AUTH0_DOMAIN}/v2/logout?${params.toString()}`;
 }
+

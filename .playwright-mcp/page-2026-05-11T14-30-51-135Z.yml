@@ -1,0 +1,31 @@
+- main [ref=e3]:
+  - generic [ref=e6]:
+    - generic [ref=e7]:
+      - img "E-ADM" [ref=e8]
+      - heading "Enter Your Password" [level=1] [ref=e9]
+      - paragraph [ref=e11]: Enter your password for E-ADM to continue to E-ADM
+    - generic [ref=e12]:
+      - generic [ref=e13]:
+        - generic [ref=e15]:
+          - generic [ref=e17]:
+            - generic [ref=e18]: grower@atko.email
+            - link "Edit email address" [ref=e19] [cursor=pointer]:
+              - /url: /u/login/identifier?state=hKFo2SAxZTN3d3ZodnFQUDNqWXNmODh6cGE3MVVfTFNKZVBiQqFur3VuaXZlcnNhbC1sb2dpbqN0aWTZIHMwVTFYMGpCOUFEem5IT2NkWVhpNjdHdGRUVWhPd2Iyo2NpZNkgdU5GNnBlaEpFc0poMFNia3pJSE90OTU4RHlhODBqWUo
+              - text: Edit
+          - generic [ref=e20]:
+            - generic [ref=e21]:
+              - generic [ref=e22]: Password *
+              - textbox "Password" [active] [ref=e23]
+              - switch "Show password" [ref=e24] [cursor=pointer]
+            - generic [ref=e25]: Wrong email or password
+        - paragraph [ref=e27]:
+          - link "Reset password" [ref=e28] [cursor=pointer]:
+            - /url: /u/login/password-reset-start/BusinessCustomers/grower%40atko.email?state=hKFo2SAxZTN3d3ZodnFQUDNqWXNmODh6cGE3MVVfTFNKZVBiQqFur3VuaXZlcnNhbC1sb2dpbqN0aWTZIHMwVTFYMGpCOUFEem5IT2NkWVhpNjdHdGRUVWhPd2Iyo2NpZNkgdU5GNnBlaEpFc0poMFNia3pJSE90OTU4RHlhODBqWUo
+        - button "Continue" [ref=e30] [cursor=pointer]
+      - paragraph [ref=e32]:
+        - text: Don't have an account?
+        - link "Sign up" [ref=e33] [cursor=pointer]:
+          - /url: /u/signup/identifier?state=hKFo2SAxZTN3d3ZodnFQUDNqWXNmODh6cGE3MVVfTFNKZVBiQqFur3VuaXZlcnNhbC1sb2dpbqN0aWTZIHMwVTFYMGpCOUFEem5IT2NkWVhpNjdHdGRUVWhPd2Iyo2NpZNkgdU5GNnBlaEpFc0poMFNia3pJSE90OTU4RHlhODBqWUo
+      - generic [ref=e35]: Or
+      - button "Email me a code" [ref=e38] [cursor=pointer]:
+        - generic [ref=e40]: Email me a code

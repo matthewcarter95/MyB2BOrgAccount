@@ -95,7 +95,12 @@ export async function getSession(sessionId: string): Promise<Session | null> {
 
 export async function getSessionWithDecryptedTokens(
   sessionId: string
-): Promise<(Session & { decryptedAccessToken: string; decryptedIdToken: string }) | null> {
+): Promise<(Session & {
+  decryptedAccessToken: string;
+  decryptedIdToken: string;
+  decryptedRefreshToken: string | null;
+  decryptedMyOrgToken: string | null;
+}) | null> {
   const session = await getSession(sessionId);
   if (!session) return null;
 
@@ -103,6 +108,8 @@ export async function getSessionWithDecryptedTokens(
     ...session,
     decryptedAccessToken: decrypt(session.accessToken),
     decryptedIdToken: decrypt(session.idToken),
+    decryptedRefreshToken: session.refreshToken ? decrypt(session.refreshToken) : null,
+    decryptedMyOrgToken: session.myOrgAccessToken ? decrypt(session.myOrgAccessToken) : null,
   };
 }
 
@@ -114,6 +121,19 @@ export async function updateSessionOrg(sessionId: string, newOrgId: string): Pro
       UpdateExpression: 'SET orgId = :orgId',
       ExpressionAttributeValues: {
         ':orgId': newOrgId,
+      },
+    })
+  );
+}
+
+export async function updateSessionMyOrgToken(sessionId: string, myOrgAccessToken: string): Promise<void> {
+  await docClient.send(
+    new UpdateCommand({
+      TableName: TABLE_NAME,
+      Key: { sessionId },
+      UpdateExpression: 'SET myOrgAccessToken = :myOrgAccessToken',
+      ExpressionAttributeValues: {
+        ':myOrgAccessToken': encrypt(myOrgAccessToken),
       },
     })
   );

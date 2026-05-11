@@ -12,8 +12,10 @@ import {
   getSession,
   getSessionWithDecryptedTokens,
   updateSessionOrg,
+  updateSessionMyOrgToken,
   isSessionValid,
 } from '../session.js';
+import { exchangeForMyOrgToken } from '../auth.js';
 import type { ApiResponse, OrgDetails, OrgConfig, IdentityProvider } from '../types.js';
 
 async function getValidSession(sessionId: string | null) {
@@ -27,6 +29,64 @@ async function getValidSession(sessionId: string | null) {
   }
 
   return { session };
+}
+
+// Get My Org API access token via silent auth (refresh token exchange)
+// Initial login has no audience - we exchange refresh token for My Org scoped token
+async function getMyOrgAccessToken(session: Awaited<ReturnType<typeof getSessionWithDecryptedTokens>>): Promise<string | null> {
+  if (!session) return null;
+
+  // Log the session roles for debugging
+  console.log('Session roles (https://example.com/roles):', session.roles);
+  console.log('Session orgId:', session.orgId);
+
+  // Prefer the initial access token from login if it has the My Org audience —
+  // it carries the org-picker session context that refresh token exchanges may lack.
+  try {
+    const parts = session.decryptedAccessToken.split('.');
+    const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+    const aud: string[] = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
+    if (aud.some((a) => a.includes('/my-org/'))) {
+      console.log('Using initial access token (my-org audience), scope:', payload.scope);
+      return session.decryptedAccessToken;
+    }
+  } catch (e) {
+    // not a decodable JWT
+  }
+
+  // Check if we have a cached My Org token with the correct audience
+  if (session.decryptedMyOrgToken) {
+    try {
+      const parts = session.decryptedMyOrgToken.split('.');
+      const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+      const aud: string[] = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
+      if (aud.some((a) => a.includes('/my-org/'))) {
+        console.log('Using cached My Org access token, scope:', payload.scope);
+        return session.decryptedMyOrgToken;
+      }
+      console.log('Cached token has wrong audience, re-exchanging:', payload.aud);
+    } catch (e) {
+      console.log('Could not decode cached My Org token');
+    }
+  }
+
+  // Exchange refresh token for My Org API scoped token with organization context
+  if (session.decryptedRefreshToken && session.orgId) {
+    console.log('Exchanging refresh token for My Org API token with org:', session.orgId);
+    const tokens = await exchangeForMyOrgToken(session.decryptedRefreshToken, session.orgId);
+    if (tokens) {
+      try {
+        const parts = tokens.access_token.split('.');
+        const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+        console.log('Exchanged My Org token audience:', payload.aud, 'scope:', payload.scope);
+      } catch (e) { /* ignore */ }
+      await updateSessionMyOrgToken(session.sessionId, tokens.access_token);
+      return tokens.access_token;
+    }
+  }
+
+  console.log('No My Org token available');
+  return null;
 }
 
 function requireAdmin(roles: string[]): string | null {
@@ -45,7 +105,11 @@ export async function handleGetOrgDetails(
   }
 
   try {
-    const details = await getOrgDetails(result.session.decryptedAccessToken);
+    const myOrgToken = await getMyOrgAccessToken(result.session);
+    if (!myOrgToken) {
+      return { success: false, error: 'Failed to get My Org API token' };
+    }
+    const details = await getOrgDetails(myOrgToken);
     return { success: true, data: details };
   } catch (err) {
     console.error('Get org details error:', err);
@@ -68,8 +132,12 @@ export async function handleUpdateOrgDetails(
   }
 
   try {
+    const myOrgToken = await getMyOrgAccessToken(result.session);
+    if (!myOrgToken) {
+      return { success: false, error: 'Failed to get My Org API token' };
+    }
     const updates = JSON.parse(event.body || '{}');
-    const details = await updateOrgDetails(result.session.decryptedAccessToken, updates);
+    const details = await updateOrgDetails(myOrgToken, updates);
     return { success: true, data: details };
   } catch (err) {
     console.error('Update org details error:', err);
@@ -86,7 +154,11 @@ export async function handleGetOrgConfig(
   }
 
   try {
-    const config = await getOrgConfig(result.session.decryptedAccessToken);
+    const myOrgToken = await getMyOrgAccessToken(result.session);
+    if (!myOrgToken) {
+      return { success: false, error: 'Failed to get My Org API token' };
+    }
+    const config = await getOrgConfig(myOrgToken);
     return { success: true, data: config };
   } catch (err) {
     console.error('Get org config error:', err);
@@ -103,7 +175,11 @@ export async function handleGetIdentityProviders(
   }
 
   try {
-    const providers = await getIdentityProviders(result.session.decryptedAccessToken);
+    const myOrgToken = await getMyOrgAccessToken(result.session);
+    if (!myOrgToken) {
+      return { success: false, error: 'Failed to get My Org API token' };
+    }
+    const providers = await getIdentityProviders(myOrgToken);
     return { success: true, data: providers };
   } catch (err) {
     console.error('Get identity providers error:', err);
@@ -126,8 +202,12 @@ export async function handleCreateIdentityProvider(
   }
 
   try {
+    const myOrgToken = await getMyOrgAccessToken(result.session);
+    if (!myOrgToken) {
+      return { success: false, error: 'Failed to get My Org API token' };
+    }
     const provider = JSON.parse(event.body || '{}');
-    const created = await createIdentityProvider(result.session.decryptedAccessToken, provider);
+    const created = await createIdentityProvider(myOrgToken, provider);
     return { success: true, data: created };
   } catch (err) {
     console.error('Create identity provider error:', err);
@@ -151,9 +231,13 @@ export async function handleUpdateIdentityProvider(
   }
 
   try {
+    const myOrgToken = await getMyOrgAccessToken(result.session);
+    if (!myOrgToken) {
+      return { success: false, error: 'Failed to get My Org API token' };
+    }
     const updates = JSON.parse(event.body || '{}');
     const updated = await updateIdentityProvider(
-      result.session.decryptedAccessToken,
+      myOrgToken,
       providerId,
       updates
     );
@@ -179,7 +263,11 @@ export async function handleDeleteIdentityProvider(
   }
 
   try {
-    await deleteIdentityProvider(result.session.decryptedAccessToken, providerId);
+    const myOrgToken = await getMyOrgAccessToken(result.session);
+    if (!myOrgToken) {
+      return { success: false, error: 'Failed to get My Org API token' };
+    }
+    await deleteIdentityProvider(myOrgToken, providerId);
     return { success: true };
   } catch (err) {
     console.error('Delete identity provider error:', err);

@@ -33,6 +33,7 @@ export async function handleLogin(): Promise<{ statusCode: number; headers: Reco
   await storePkceState(state, codeVerifier);
 
   const loginUrl = await generateLoginUrl(state, codeVerifier);
+  console.log('Generated login URL:', loginUrl);
 
   return {
     statusCode: 302,
@@ -104,8 +105,25 @@ export async function handleCallback(
     console.log('Exchanging code for tokens...');
     const tokens = await exchangeCodeForTokens(code, codeVerifier);
     console.log('Token exchange successful, verifying ID token...');
+
+    // Log the access token scopes
+    try {
+      const parts = tokens.access_token.split('.');
+      const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+      console.log('Access token audience:', payload.aud);
+      console.log('Access token scope:', payload.scope);
+    } catch (e) {
+      console.log('Could not decode access token for logging');
+    }
+
     const claims = await verifyIdToken(tokens.id_token);
     console.log('ID token verified, creating session...');
+
+    // Log the roles from ID token (https://example.com/roles claim)
+    const namespace = 'https://example.com';
+    const roles = (claims as Record<string, unknown>)[`${namespace}/roles`] as string[] || [];
+    console.log('ID token roles (https://example.com/roles):', roles);
+    console.log('ID token org_id:', claims.org_id);
 
     // Get user's organizations (from ID token or Management API)
     const orgs = claims.org_id ? [claims.org_id] : [];

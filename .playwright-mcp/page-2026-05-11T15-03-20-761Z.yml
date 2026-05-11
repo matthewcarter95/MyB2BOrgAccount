@@ -1,0 +1,36 @@
+- generic [ref=e2]:
+  - banner [ref=e3]:
+    - generic [ref=e5]:
+      - link "ADM e-ADM Online Services" [ref=e6] [cursor=pointer]:
+        - /url: /
+        - generic [ref=e7]: ADM
+        - generic [ref=e8]: e-ADM Online Services
+      - navigation [ref=e9]:
+        - link "Home" [ref=e10] [cursor=pointer]:
+          - /url: /
+        - link "Dashboard" [ref=e11] [cursor=pointer]:
+          - /url: /dashboard
+      - generic [ref=e13]:
+        - generic [ref=e14]: grower@atko.email
+        - button "Log Out" [ref=e15] [cursor=pointer]
+  - generic [ref=e17]:
+    - generic [ref=e19]:
+      - heading "Dashboard" [level=1] [ref=e20]
+      - paragraph [ref=e21]: Welcome back, grower@atko.email
+    - generic [ref=e22]:
+      - generic [ref=e23]:
+        - img [ref=e25]
+        - generic [ref=e27]:
+          - generic [ref=e28]: Organization
+          - generic [ref=e29]: org_uudgUNJ3yUhQOjdG
+      - generic [ref=e30]:
+        - img [ref=e32]
+        - generic [ref=e34]:
+          - generic [ref=e35]: Role
+          - generic [ref=e37]: Member
+      - generic [ref=e38]:
+        - img [ref=e40]
+        - generic [ref=e42]:
+          - generic [ref=e43]: Subscription
+          - generic [ref=e44]: basic
+    - generic [ref=e46]: Failed to get organization details

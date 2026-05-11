@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "/Users/matt.carter/.npm-global/bin/playwright-mcp"
+    }
+  }
+}

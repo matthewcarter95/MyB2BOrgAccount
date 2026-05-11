@@ -1,0 +1,47 @@
+- generic [ref=e2]:
+  - banner [ref=e3]:
+    - generic [ref=e5]:
+      - link "ADM e-ADM Online Services" [ref=e6] [cursor=pointer]:
+        - /url: /
+        - generic [ref=e7]: ADM
+        - generic [ref=e8]: e-ADM Online Services
+      - navigation [ref=e9]:
+        - link "Home" [ref=e10] [cursor=pointer]:
+          - /url: /
+  - generic [ref=e13]:
+    - generic [ref=e15]:
+      - generic [ref=e16]:
+        - heading "Welcome to e-ADM Online Services" [level=1] [ref=e17]
+        - paragraph [ref=e18]: Your trusted partner for agricultural commodities trading and organization management. Access real-time market data and manage your organization with ease.
+        - generic [ref=e19]:
+          - button "Get Started" [ref=e20] [cursor=pointer]
+          - button "Sign In" [ref=e21] [cursor=pointer]
+      - generic [ref=e22]:
+        - generic [ref=e23]:
+          - img [ref=e25]
+          - generic [ref=e27]: Real-time Market Data
+        - generic [ref=e28]:
+          - img [ref=e30]
+          - generic [ref=e32]: Global Trading Network
+        - generic [ref=e33]:
+          - img [ref=e35]
+          - generic [ref=e37]: Secure Organization Management
+    - generic [ref=e39]:
+      - heading "Commodity Futures Prices" [level=2] [ref=e40]: Commodity Futures Prices
+      - paragraph [ref=e42]: Stay informed with the latest agricultural commodity futures prices.
+      - generic [ref=e43]: Loading prices...
+    - generic [ref=e46]:
+      - heading "Why Choose e-ADM?" [level=2] [ref=e47]: Why Choose e-ADM?
+      - generic [ref=e49]:
+        - generic [ref=e50]:
+          - img [ref=e52]
+          - heading "Organization Management" [level=3] [ref=e54]
+          - paragraph [ref=e55]: Easily manage your organization settings, identity providers, and team members from a single dashboard.
+        - generic [ref=e56]:
+          - img [ref=e58]
+          - heading "Enterprise Security" [level=3] [ref=e60]
+          - paragraph [ref=e61]: Secure single sign-on with support for SAML, OIDC, and social identity providers.
+        - generic [ref=e62]:
+          - img [ref=e64]
+          - heading "Market Intelligence" [level=3] [ref=e66]
+          - paragraph [ref=e67]: Access real-time commodity prices and market data to make informed trading decisions.

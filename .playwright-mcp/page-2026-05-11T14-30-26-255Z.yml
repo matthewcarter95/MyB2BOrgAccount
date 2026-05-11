@@ -1,0 +1,23 @@
+- main [ref=e3]:
+  - generic [ref=e6]:
+    - generic [ref=e7]:
+      - img "E-ADM" [ref=e8]
+      - heading "Welcome" [level=1] [ref=e9]
+      - paragraph [ref=e11]: Login to E-ADM to continue to ADM Access
+    - generic [ref=e12]:
+      - generic [ref=e15]:
+        - button: Continue
+        - generic [ref=e19]:
+          - generic [ref=e20]: Email address *
+          - textbox "Email address" [active] [ref=e21]
+        - paragraph [ref=e22]:
+          - link "Can't log in to your account?" [ref=e23] [cursor=pointer]:
+            - /url: /u/login/password-reset-start/BusinessCustomers?state=hKFo2SAxZTN3d3ZodnFQUDNqWXNmODh6cGE3MVVfTFNKZVBiQqFur3VuaXZlcnNhbC1sb2dpbqN0aWTZIHMwVTFYMGpCOUFEem5IT2NkWVhpNjdHdGRUVWhPd2Iyo2NpZNkgdU5GNnBlaEpFc0poMFNia3pJSE90OTU4RHlhODBqWUo
+        - button "Continue" [ref=e25] [cursor=pointer]
+      - paragraph [ref=e27]:
+        - text: Don't have an account?
+        - link "Sign up" [ref=e28] [cursor=pointer]:
+          - /url: /u/signup/identifier?state=hKFo2SAxZTN3d3ZodnFQUDNqWXNmODh6cGE3MVVfTFNKZVBiQqFur3VuaXZlcnNhbC1sb2dpbqN0aWTZIHMwVTFYMGpCOUFEem5IT2NkWVhpNjdHdGRUVWhPd2Iyo2NpZNkgdU5GNnBlaEpFc0poMFNia3pJSE90OTU4RHlhODBqWUo
+      - generic [ref=e30]: Or
+      - button "Continue with a passkey" [ref=e33] [cursor=pointer]:
+        - generic [ref=e35]: Continue with a passkey

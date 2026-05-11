@@ -10,6 +10,7 @@ export interface Session {
   idToken: string;
   accessToken: string;
   refreshToken: string;
+  myOrgAccessToken?: string; // Cached My Org API access token
   revokedAt?: number;
   expiresAt: number;
   createdAt: number;

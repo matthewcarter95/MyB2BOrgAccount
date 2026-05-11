@@ -1,0 +1,14 @@
+- main [ref=e3]:
+  - generic [ref=e6]:
+    - generic [ref=e7]:
+      - img "E-ADM" [ref=e8]
+      - heading "Choose an Account to Continue" [level=1] [ref=e9]
+      - paragraph [ref=e11]: grower@atko.email is used as a personal account and is a part of multiple organizations.
+    - generic [ref=e12]:
+      - button "Continue with personal account" [ref=e14] [cursor=pointer]:
+        - img [ref=e15]
+        - generic [ref=e16]: Continue with personal account
+      - generic [ref=e18]: OR
+      - button "chipotle" [ref=e21] [cursor=pointer]:
+        - img [ref=e22]
+        - generic [ref=e23]: chipotle
