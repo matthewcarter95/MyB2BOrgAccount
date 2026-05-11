@@ -2,6 +2,7 @@ import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda
 import {
   handleLogin,
   handleSignup,
+  handleReauth,
   handleCallback,
   handleLogout,
   handleGetMe,
@@ -78,6 +79,11 @@ export async function handler(event: APIGatewayProxyEventV2): Promise<APIGateway
 
     if (method === 'GET' && path === '/auth/signup') {
       const { statusCode, headers } = await handleSignup();
+      return redirectResponse(statusCode, headers);
+    }
+
+    if (method === 'GET' && path === '/auth/reauth') {
+      const { statusCode, headers } = await handleReauth(event);
       return redirectResponse(statusCode, headers);
     }
 

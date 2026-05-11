@@ -257,13 +257,19 @@ interface PkceState {
   sessionId: string; // PK - use state as sessionId with 'pkce:' prefix
   codeVerifier: string;
   expiresAt: number; // TTL
+  oldSessionId?: string; // session to revoke after successful reauth
 }
 
-export async function storePkceState(state: string, codeVerifier: string): Promise<void> {
+export async function storePkceState(
+  state: string,
+  codeVerifier: string,
+  oldSessionId?: string
+): Promise<void> {
   const item: PkceState = {
     sessionId: `pkce:${state}`,
     codeVerifier,
     expiresAt: Math.floor((Date.now() + 10 * 60 * 1000) / 1000), // 10 min TTL
+    ...(oldSessionId && { oldSessionId }),
   };
 
   await docClient.send(
@@ -274,7 +280,9 @@ export async function storePkceState(state: string, codeVerifier: string): Promi
   );
 }
 
-export async function getPkceState(state: string): Promise<string | null> {
+export async function getPkceState(
+  state: string
+): Promise<{ codeVerifier: string; oldSessionId?: string } | null> {
   const result = await docClient.send(
     new GetCommand({
       TableName: TABLE_NAME,
@@ -294,7 +302,7 @@ export async function getPkceState(state: string): Promise<string | null> {
     return null;
   }
 
-  return pkce.codeVerifier;
+  return { codeVerifier: pkce.codeVerifier, oldSessionId: pkce.oldSessionId };
 }
 
 export async function deletePkceState(state: string): Promise<void> {

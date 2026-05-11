@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import { switchOrg } from '../services/api';
+import { switchOrg, reauth } from '../services/api';
 
 export function OrgSelector() {
   const { user, refreshUser } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [switching, setSwitching] = useState(false);
 
-  if (!user || user.orgs.length <= 1) {
+  if (!user) {
     return null;
   }
 
@@ -68,6 +68,13 @@ export function OrgSelector() {
               )}
             </button>
           ))}
+          <div className="org-divider" />
+          <button
+            className="org-option org-option-reauth"
+            onClick={() => { setIsOpen(false); reauth(); }}
+          >
+            Sign in to another org&hellip;
+          </button>
         </div>
       )}
 
@@ -144,6 +151,17 @@ export function OrgSelector() {
         .org-option.active {
           color: var(--color-primary);
           font-weight: 500;
+        }
+
+        .org-divider {
+          height: 1px;
+          background: var(--color-border);
+          margin: 4px 0;
+        }
+
+        .org-option-reauth {
+          color: var(--color-text-secondary);
+          font-style: italic;
         }
       `}</style>
     </div>

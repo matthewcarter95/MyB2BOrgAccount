@@ -2,6 +2,7 @@ import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import {
   generateLoginUrl,
   generateSignupUrl,
+  generateReauthUrl,
   generateCodeVerifier,
   generateState,
   exchangeCodeForTokens,
@@ -61,6 +62,26 @@ export async function handleSignup(): Promise<{ statusCode: number; headers: Rec
   };
 }
 
+export async function handleReauth(
+  event: APIGatewayProxyEventV2
+): Promise<{ statusCode: number; headers: Record<string, string> }> {
+  const state = generateState();
+  const codeVerifier = generateCodeVerifier();
+  const oldSessionId = getSessionIdFromCookie(event);
+
+  await storePkceState(state, codeVerifier, oldSessionId ?? undefined);
+
+  const reauthUrl = await generateReauthUrl(state, codeVerifier);
+
+  return {
+    statusCode: 302,
+    headers: {
+      Location: reauthUrl,
+      'Cache-Control': 'no-store',
+    },
+  };
+}
+
 export async function handleCallback(
   event: APIGatewayProxyEventV2
 ): Promise<{ statusCode: number; headers: Record<string, string>; body?: string }> {
@@ -88,15 +109,17 @@ export async function handleCallback(
     };
   }
 
-  const codeVerifier = await getPkceState(state);
-  console.log('PKCE state lookup:', { found: !!codeVerifier });
-  if (!codeVerifier) {
+  const pkceData = await getPkceState(state);
+  console.log('PKCE state lookup:', { found: !!pkceData });
+  if (!pkceData) {
     return {
       statusCode: 400,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ error: 'Invalid or expired state' }),
     };
   }
+
+  const { codeVerifier, oldSessionId } = pkceData;
 
   // Delete PKCE state after retrieval
   await deletePkceState(state);
@@ -131,6 +154,12 @@ export async function handleCallback(
     const session = await createSession(tokens, claims, orgs);
 
     console.log('Session created:', session.sessionId);
+
+    // Revoke the previous session when this was a reauth flow
+    if (oldSessionId) {
+      await revokeSession(oldSessionId);
+      console.log('Revoked old session:', oldSessionId);
+    }
 
     // Set HTTP-only session cookie
     // SameSite=None required for cross-domain cookies (Lambda URL != frontend domain)

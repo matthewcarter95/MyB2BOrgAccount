@@ -41,6 +41,10 @@ export function logout(): void {
   window.location.href = `${API_URL}/auth/logout`;
 }
 
+export function reauth(): void {
+  window.location.href = `${API_URL}/auth/reauth`;
+}
+
 export async function getMe(): Promise<ApiResponse<UserInfo>> {
   return request<UserInfo>('/auth/me');
 }
