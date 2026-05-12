@@ -53,6 +53,32 @@ export async function generateLoginUrl(state: string, codeVerifier: string): Pro
   return `https://${AUTH0_DOMAIN}/authorize?${params.toString()}`;
 }
 
+export async function generateInitiateLoginUrl(
+  state: string,
+  codeVerifier: string,
+  organizationId?: string,
+  loginHint?: string
+): Promise<string> {
+  const codeChallenge = await generateCodeChallenge(codeVerifier);
+  const callbackUrl = BACKEND_URL ? `${BACKEND_URL}/auth/callback` : `${FRONTEND_URL}/callback`;
+
+  const params = new URLSearchParams({
+    response_type: 'code',
+    client_id: AUTH0_CLIENT_ID,
+    redirect_uri: callbackUrl,
+    scope: AUTH0_SCOPES,
+    state,
+    code_challenge: codeChallenge,
+    code_challenge_method: 'S256',
+  });
+
+  if (AUTH0_MYORG_AUDIENCE) params.set('audience', AUTH0_MYORG_AUDIENCE);
+  if (organizationId) params.set('organization', organizationId);
+  if (loginHint) params.set('login_hint', loginHint);
+
+  return `https://${AUTH0_DOMAIN}/authorize?${params.toString()}`;
+}
+
 export async function generateReauthUrl(state: string, codeVerifier: string): Promise<string> {
   const codeChallenge = await generateCodeChallenge(codeVerifier);
   const callbackUrl = BACKEND_URL ? `${BACKEND_URL}/auth/callback` : `${FRONTEND_URL}/callback`;

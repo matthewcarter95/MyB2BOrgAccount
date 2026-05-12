@@ -3,6 +3,7 @@ import {
   generateLoginUrl,
   generateSignupUrl,
   generateReauthUrl,
+  generateInitiateLoginUrl,
   generateCodeVerifier,
   generateState,
   exchangeCodeForTokens,
@@ -77,6 +78,30 @@ export async function handleReauth(
     statusCode: 302,
     headers: {
       Location: reauthUrl,
+      'Cache-Control': 'no-store',
+    },
+  };
+}
+
+export async function handleInitiateLogin(
+  event: APIGatewayProxyEventV2
+): Promise<{ statusCode: number; headers: Record<string, string> }> {
+  const params = event.queryStringParameters || {};
+  const { iss, login_hint, organization } = params;
+
+  if (iss) console.log('Initiate login: iss =', iss, 'org =', organization);
+
+  const state = generateState();
+  const codeVerifier = generateCodeVerifier();
+
+  await storePkceState(state, codeVerifier);
+
+  const loginUrl = await generateInitiateLoginUrl(state, codeVerifier, organization, login_hint);
+
+  return {
+    statusCode: 302,
+    headers: {
+      Location: loginUrl,
       'Cache-Control': 'no-store',
     },
   };

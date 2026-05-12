@@ -1,42 +1,20 @@
 import { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import { switchOrg, reauth } from '../services/api';
+import { reauth } from '../services/api';
 
 export function OrgSelector() {
-  const { user, refreshUser } = useAuth();
+  const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
-  const [switching, setSwitching] = useState(false);
 
   if (!user) {
     return null;
   }
-
-  const handleSwitch = async (orgId: string) => {
-    if (orgId === user.orgId) {
-      setIsOpen(false);
-      return;
-    }
-
-    setSwitching(true);
-    try {
-      const response = await switchOrg(orgId);
-      if (response.success) {
-        await refreshUser();
-      }
-    } catch (error) {
-      console.error('Failed to switch organization:', error);
-    } finally {
-      setSwitching(false);
-      setIsOpen(false);
-    }
-  };
 
   return (
     <div className="org-selector">
       <button
         className="org-selector-button"
         onClick={() => setIsOpen(!isOpen)}
-        disabled={switching}
       >
         <span className="org-current">{user.orgId}</span>
         <svg
@@ -54,26 +32,21 @@ export function OrgSelector() {
 
       {isOpen && (
         <div className="org-dropdown">
-          {user.orgs.map((orgId) => (
-            <button
-              key={orgId}
-              className={`org-option ${orgId === user.orgId ? 'active' : ''}`}
-              onClick={() => handleSwitch(orgId)}
-            >
-              {orgId}
-              {orgId === user.orgId && (
-                <svg viewBox="0 0 24 24" width="16" height="16">
-                  <path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" />
-                </svg>
-              )}
-            </button>
-          ))}
+          <button
+            className="org-option active"
+            onClick={() => setIsOpen(false)}
+          >
+            {user.orgId}
+            <svg viewBox="0 0 24 24" width="16" height="16">
+              <path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" />
+            </svg>
+          </button>
           <div className="org-divider" />
           <button
             className="org-option org-option-reauth"
             onClick={() => { setIsOpen(false); reauth(); }}
           >
-            Sign in to another org&hellip;
+            Switch organization&hellip;
           </button>
         </div>
       )}
@@ -97,11 +70,6 @@ export function OrgSelector() {
 
         .org-selector-button:hover {
           border-color: var(--color-primary);
-        }
-
-        .org-selector-button:disabled {
-          opacity: 0.7;
-          cursor: not-allowed;
         }
 
         .org-current {

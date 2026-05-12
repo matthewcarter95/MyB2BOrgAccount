@@ -3,6 +3,7 @@ import {
   handleLogin,
   handleSignup,
   handleReauth,
+  handleInitiateLogin,
   handleCallback,
   handleLogout,
   handleGetMe,
@@ -72,6 +73,11 @@ export async function handler(event: APIGatewayProxyEventV2): Promise<APIGateway
     }
 
     // Auth routes
+    if (method === 'GET' && path === '/auth/initiate-login') {
+      const { statusCode, headers } = await handleInitiateLogin(event);
+      return redirectResponse(statusCode, headers);
+    }
+
     if (method === 'GET' && path === '/auth/login') {
       const { statusCode, headers } = await handleLogin();
       return redirectResponse(statusCode, headers);
